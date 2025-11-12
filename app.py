@@ -12,7 +12,6 @@ PROXY_PASS = os.getenv("YTDLP_PROXY_PASS")
 
 proxy_url = None
 if PROXY_HOST and PROXY_PORT:
-    # Build proxy string if credentials provided
     if PROXY_USER and PROXY_PASS:
         proxy_url = f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_HOST}:{PROXY_PORT}"
     else:
@@ -20,7 +19,7 @@ if PROXY_HOST and PROXY_PORT:
 
 @app.route("/")
 def index():
-    return jsonify({"message": "yt-dlp API is running"}), 200
+    return jsonify({"message": "yt‑dlp API is running"}), 200
 
 @app.route("/audio", methods=["GET"])
 def get_audio_link():
@@ -28,7 +27,7 @@ def get_audio_link():
     if not song_name:
         return jsonify({"error": "Missing required parameter ‘song’"}), 400
 
-    query = f"ytsearch1:{song_name}"  # first search result
+    query = f"ytsearch1:{song_name}"  # search YouTube for first result
     ydl_opts = {
         "quiet": True,
         "skip_download": True,
@@ -43,12 +42,14 @@ def get_audio_link():
             video = info["entries"][0]
 
         formats = video.get("formats", [])
-        audio_url = None
-        for f in formats:
-            if f.get("vcodec") == "none":  # audio only
-                audio_url = f.get("url")
-                break
-        if not audio_url:
+        # filter for true audio‐only formats
+        audio_only = [f for f in formats if f.get("vcodec") == "none" and f.get("acodec") not in (None, 'none')]
+        audio_only.sort(key=lambda f: (f.get("abr", 0), f.get("tbr", 0)), reverse=True)
+
+        if audio_only:
+            audio_url = audio_only[0].get("url")
+        else:
+            # fallback to whichever URL is present
             audio_url = video.get("url")
 
         return jsonify({
