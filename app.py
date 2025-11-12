@@ -4,8 +4,23 @@ import os
 
 app = Flask(__name__)
 
-# Example: proxy credentials as environment variable or config
-PROXY = os.getenv("YTDLP_PROXY", "http://username:password@142.111.48.253:7030")
+# Read proxy credentials from environment variables
+PROXY_HOST = os.getenv("YTDLP_PROXY_HOST")
+PROXY_PORT = os.getenv("YTDLP_PROXY_PORT")
+PROXY_USER = os.getenv("YTDLP_PROXY_USER")
+PROXY_PASS = os.getenv("YTDLP_PROXY_PASS")
+
+proxy_url = None
+if PROXY_HOST and PROXY_PORT:
+    # Build proxy string if credentials provided
+    if PROXY_USER and PROXY_PASS:
+        proxy_url = f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_HOST}:{PROXY_PORT}"
+    else:
+        proxy_url = f"http://{PROXY_HOST}:{PROXY_PORT}"
+
+@app.route("/")
+def index():
+    return jsonify({"message": "yt-dlp API is running"}), 200
 
 @app.route("/audio", methods=["GET"])
 def get_audio_link():
@@ -13,13 +28,14 @@ def get_audio_link():
     if not song_name:
         return jsonify({"error": "Missing required parameter ‘song’"}), 400
 
-    query = f"ytsearch1:{song_name}"
+    query = f"ytsearch1:{song_name}"  # first search result
     ydl_opts = {
         "quiet": True,
         "skip_download": True,
         "format": "bestaudio/best",
-        "proxy": PROXY,
     }
+    if proxy_url:
+        ydl_opts["proxy"] = proxy_url
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -29,7 +45,7 @@ def get_audio_link():
         formats = video.get("formats", [])
         audio_url = None
         for f in formats:
-            if f.get("vcodec") == "none":
+            if f.get("vcodec") == "none":  # audio only
                 audio_url = f.get("url")
                 break
         if not audio_url:
